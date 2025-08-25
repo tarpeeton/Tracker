@@ -140,10 +140,10 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
 
 
   return (
-    <section className="p-10 w-full min-h-screen bg-gray-900">
+    <section className="p-10 w-full min-h-screen bg-[#1f1f1f]">
       {/* Summary Cards */}
       <div className="grid lg:grid-cols-3 gap-6 mb-16 mt-10">
-        <article className="bg-gray-800 border border-gray-700 rounded-lg p-5 hover:scale-105 duration-150 ease-in">
+        <article className="bg-[#2b2a2a] border border-gray-700 rounded-lg p-5 hover:scale-105 duration-150 ease-in">
           <div className="flex justify-between items-center">
             <p className="text-white lg:text-[21px]">Общий доход</p>
             <TrendingUp className="text-green-500" />
@@ -155,7 +155,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
           </div>
         </article>
 
-        <article className="bg-gray-800 border border-gray-700 rounded-lg p-5 hover:scale-105 duration-150 ease-in">
+        <article className="bg-[#2b2a2a] border border-gray-700 rounded-lg p-5 hover:scale-105 duration-150 ease-in">
           <div className="flex justify-between items-center">
             <p className="text-white lg:text-[21px]">Общие расходы</p>
             <TrendingDown className="text-red-500" />
@@ -167,7 +167,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
           </div>
         </article>
 
-        <article className="bg-gray-800 border border-gray-700 rounded-lg p-5 hover:scale-105 duration-150 ease-in">
+        <article className="bg-[#2b2a2a] border border-gray-700 rounded-lg p-5 hover:scale-105 duration-150 ease-in">
           <div className="flex justify-between items-center">
             <p className="text-white lg:text-[21px]">Баланс</p>
             <div className="flex items-center gap-4">
@@ -214,7 +214,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
 
       {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6 mb-16">
-        <div className="bg-gray-800 p-5 rounded-lg shadow-md">
+        <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md">
           <h2 className="text-white mb-5 text-lg font-semibold">Доход</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData}>
@@ -252,7 +252,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-gray-800 p-5 rounded-lg shadow-md">
+        <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md">
           <h2 className="text-white mb-5 text-lg font-semibold">
             Распределение расходов по категориям
           </h2>
@@ -291,7 +291,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
       </div>
 
       {/* Daily Heatmap */}
-      <div className="bg-gray-800 p-5 rounded-lg shadow-md mb-16">
+      <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md mb-16">
         <h2 className="text-white mb-5 text-lg font-semibold">
           Ежедневные расходы
         </h2>
@@ -316,7 +316,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
       </div>
 
       {/* Active Goals Section */}
-      <div className="bg-gray-800 p-5 rounded-lg shadow-md mb-16">
+      <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md mb-16">
         <h2 className="text-white mb-5 text-lg font-semibold">Активные цели</h2>
         {goals.map((goal, idx) => {
           const percent = Math.floor((goal.balance / goal.price) * 100);
@@ -339,7 +339,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
       </div>
 
       {/* History Section */}
-      <div className="bg-gray-800 p-5 rounded-lg shadow-md">
+      <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md">
         <h2 className="text-white mb-5 text-lg font-semibold">
           История транзакций
         </h2>

@@ -1,607 +1,594 @@
-"use client"
-import React, { useState, useMemo } from 'react';
-import { Plus, Search, Filter, ArrowLeft, Calendar, Flag, User, Clock, CheckSquare, Square, MoreHorizontal, ChevronDown, X, Maximize2, Minimize2 } from 'lucide-react';
+"use client";
+import {
+  filterOptions,
+  statusConfig,
+  statusOptions,
+} from "@/helpers/task-status";
+import { ITaskItem, TaskStore } from "@/store/TaskStore";
+import { UserStore } from "@/store/UserStore";
+import { Select } from "@/ui/Select";
+import { Calendar, Flag, Grip, Plus, User, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
-export const MainTask = () => {
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      name: "🎯 Запоминание слов на букву А на английском",
-      description: "Изучение и запоминание английских слов, начинающихся на букву А. Создание карточек для повторения, практика произношения и использование в контексте.",
-      startDate: "2025-08-17",
-      endDate: "2025-09-15",
-      priority: "Высокий",
-      status: "В работе",
-      assignee: "Иван Петров",
-      chatgpt: "chatgpt.com/c/6...ddebfc"
-    },
-    {
-      id: 2,
-      name: "📱 Porno Zavisimost",
-      description: "Работа над преодолением зависимости. Изучение методов борьбы, поиск поддержки, разработка здоровых привычек.",
-      startDate: "2025-08-20",
-      endDate: "2025-08-25",
-      priority: "Высокий",
-      status: "В работе",
-      assignee: "Иван Петров"
-    },
-    {
-      id: 3,
-      name: "📚 JavaScript Теория + Example",
-      description: "Углубленное изучение JavaScript: теоретические основы, практические примеры, создание проектов для закрепления материала.",
-      startDate: "2025-08-15",
-      endDate: "2025-08-22",
-      priority: "Высокий",
-      status: "В работе",
-      assignee: "Анна Смирнова"
+export type Status = "todo" | "in_progress" | "done" | "blocked";
+
+export const MainTask: React.FC = () => {
+  const { tasks, fetchTasks, addTask, deleteTask, editTask, dragTask } =
+    TaskStore();
+  const { user } = UserStore();
+
+  // --- UI state
+  const [filter, setFilter] = useState<"all" | Status>("all");
+  const [draggedTask, setDraggedTask] = useState<null | { id: string }>(null);
+  const [dragOverTask, setDragOverTask] = useState<string | null>(null);
+  const [editing, setEditing] = useState<null | {
+    id: string;
+    field: "title" | "status" | "start_date" | "end_date";
+  }>(null);
+  const [editValue, setEditValue] = useState<string>("");
+
+  // --- fetch once user ready
+  useEffect(() => {
+    if (user?.user_id) fetchTasks();
+  }, [user?.user_id, fetchTasks]);
+
+  // --- status configurations
+
+  // --- filter
+  const filteredTasks = useMemo(
+    () => (filter === "all" ? tasks : tasks.filter((t) => t.status === filter)),
+    [tasks, filter]
+  );
+
+  // ===== Inline edit helpers
+  const startEditing = (
+    id: string,
+    field: "title" | "status" | "start_date" | "end_date",
+    value: string | null
+  ) => {
+    // Предотвращаем конфликт - если уже редактируем что-то, сначала завершаем
+    if (editing) {
+      finishEditing();
     }
-  ]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [isDetailView, setIsDetailView] = useState(false);
-  const [isFullWidth, setIsFullWidth] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [draggedTask, setDraggedTask] = useState(null);
-
-  // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Все статусы');
-  const [priorityFilter, setPriorityFilter] = useState('Все приоритеты');
-  const [deadlineFilter, setDeadlineFilter] = useState('Все сроки');
-  const [showFilters, setShowFilters] = useState(false);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    startDate: '',
-    endDate: '',
-    priority: 'Средний',
-    status: 'Не начато',
-    assignee: '',
-    chatgpt: ''
-  });
-
-  const priorityColors = {
-    'Низкий': 'bg-green-600',
-    'Средний': 'bg-yellow-600',
-    'Высокий': 'bg-red-600'
-  };
-
-  const statusColors = {
-    'Не начато': 'text-gray-400 bg-gray-700',
-    'В работе': 'text-orange-400 bg-orange-900',
-    'Завершено': 'text-green-400 bg-green-900'
-  };
-
-  const StatusIcon = ({ status }) => {
-    if (status === 'Завершено') return <CheckSquare size={16} className="text-green-400" />;
-    if (status === 'В работе') return <Clock size={16} className="text-orange-400" />;
-    return <Square size={16} className="text-gray-400" />;
-  };
-
-  const isDeadlineNear = (endDate) => {
-    const today = new Date();
-    const deadline = new Date(endDate);
-    const diffTime = deadline - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 3;
-  };
-
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const matchesSearch = task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           task.description.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesStatus = statusFilter === 'Все статусы' || task.status === statusFilter;
-
-      const matchesPriority = priorityFilter === 'Все приоритеты' || task.priority === priorityFilter;
-
-      let matchesDeadline = true;
-      if (deadlineFilter === 'Близкие сроки') {
-        matchesDeadline = isDeadlineNear(task.endDate);
-      } else if (deadlineFilter === 'Просроченные') {
-        matchesDeadline = new Date(task.endDate) < new Date();
-      }
-
-      return matchesSearch && matchesStatus && matchesPriority && matchesDeadline;
-    });
-  }, [tasks, searchTerm, statusFilter, priorityFilter, deadlineFilter]);
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      startDate: '',
-      endDate: '',
-      priority: 'Средний',
-      status: 'Не начато',
-      assignee: '',
-      chatgpt: ''
-    });
-  };
-
-  const openModal = (task = null) => {
-    if (task) {
-      setEditingTask(task);
-      setFormData(task);
+    setEditing({ id, field });
+    if (field === "start_date" || field === "end_date") {
+      setEditValue(value ? value.split("T")[0] : "");
     } else {
-      setEditingTask(null);
-      resetForm();
+      setEditValue(value ?? "");
     }
-    setIsModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingTask(null);
-    resetForm();
+  const normalizeForDb = (
+    field: "title" | "status" | "start_date" | "end_date",
+    value: string
+  ) => {
+    if (field === "start_date" || field === "end_date") {
+      return value ? new Date(value + "T00:00:00.000Z").toISOString() : null;
+    }
+    if (field === "status") {
+      return value as Status;
+    }
+    debugger;
+
+    return value;
   };
 
-  const openTaskDetail = (task) => {
-    setSelectedTask(task);
-    setIsDetailView(true);
-  };
+  const finishEditing = async () => {
+    if (!editing) return;
 
-  const closeTaskDetail = () => {
-    setIsDetailView(false);
-    setSelectedTask(null);
-    setIsFullWidth(false);
-  };
-
-  const handleSubmit = () => {
-    if (!formData.name.trim()) return;
-
-    if (editingTask) {
-      setTasks(tasks.map(task =>
-        task.id === editingTask.id ? { ...formData, id: editingTask.id } : task
-      ));
-      if (selectedTask && selectedTask.id === editingTask.id) {
-        setSelectedTask({ ...formData, id: editingTask.id });
-      }
-    } else {
-      const newTask = {
-        ...formData,
-        id: Date.now()
+    try {
+      const payload = {
+        [editing.field]: normalizeForDb(editing.field, editValue),
       };
-      setTasks([...tasks, newTask]);
-    }
 
-    closeModal();
-  };
-
-  const deleteTask = (id) => {
-    setTasks(tasks.filter(task => task.id !== id));
-    if (selectedTask && selectedTask.id === id) {
-      closeTaskDetail();
+      await editTask(editing.id, payload);
+    } catch (error) {
+      console.error("Error updating task:", error);
+    } finally {
+      // Всегда очищаем состояние редактирования
+      setEditing(null);
+      setEditValue("");
     }
   };
 
-  const toggleTaskStatus = (id) => {
-    setTasks(tasks.map(task => {
-      if (task.id === id) {
-        const newStatus = task.status === 'Завершено' ? 'Не начато' :
-                         task.status === 'Не начато' ? 'В работе' : 'Завершено';
-        const updatedTask = { ...task, status: newStatus };
-        if (selectedTask && selectedTask.id === id) {
-          setSelectedTask(updatedTask);
-        }
-        return updatedTask;
-      }
-      return task;
-    }));
+  const cancelEditing = () => {
+    setEditing(null);
+    setEditValue("");
   };
 
-  const handleDragStart = (e, task) => {
-    setDraggedTask(task);
-    e.dataTransfer.effectAllowed = 'move';
+  const onEditKeyDown: React.KeyboardEventHandler<HTMLInputElement> = async (
+    e
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      await finishEditing();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEditing();
+    }
   };
 
-  const handleDragOver = (e) => {
+  // ===== Drag & drop
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    // Если редактируем, завершаем редактирование
+    if (editing) {
+      finishEditing();
+    }
+
+    setDraggedTask({ id: taskId });
+    e.dataTransfer.effectAllowed = "move";
+    // Добавляем визуальный эффект
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = "0.5";
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Восстанавливаем визуальный эффект
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = "1";
+
+    setDraggedTask(null);
+    setDragOverTask(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = "move";
   };
 
-  const handleDrop = (e, targetTask) => {
+  const handleDragEnter = (e: React.DragEvent, taskId: string) => {
     e.preventDefault();
+    if (draggedTask && draggedTask.id !== taskId) {
+      setDragOverTask(taskId);
+    }
+  };
 
-    if (!draggedTask || draggedTask.id === targetTask.id) return;
+  const handleDragLeave = (e: React.DragEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
 
-    const draggedIndex = tasks.findIndex(task => task.id === draggedTask.id);
-    const targetIndex = tasks.findIndex(task => task.id === targetTask.id);
+    // Проверяем, действительно ли мышь покинула элемент
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setDragOverTask(null);
+    }
+  };
 
-    const newTasks = [...tasks];
-    newTasks.splice(draggedIndex, 1);
-    newTasks.splice(targetIndex, 0, draggedTask);
+  const handleDrop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    setDragOverTask(null);
 
-    setTasks(newTasks);
+    if (!draggedTask || draggedTask.id === targetId) return;
+
+    const list = filteredTasks.length ? filteredTasks : tasks;
+    const fromIndex = list.findIndex((t) => t.id === draggedTask.id);
+    const toIndex = list.findIndex((t) => t.id === targetId);
+
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const movingUp = fromIndex > toIndex;
+    const target = list[toIndex];
+
+    let newOrder: number;
+    if (movingUp) {
+      const prev = list[toIndex - 1]?.order ?? target.order - 1;
+      newOrder = (prev + target.order) / 2;
+    } else {
+      const next = list[toIndex + 1]?.order ?? target.order + 1;
+      newOrder = (target.order + next) / 2;
+    }
+
+    try {
+      await dragTask(draggedTask.id, newOrder);
+    } catch (error) {
+      console.error("Error reordering task:", error);
+    }
+
     setDraggedTask(null);
   };
 
-  if (isDetailView && selectedTask) {
-    return (
-      <div className="min-h-screen bg-gray-900 w-full">
-        {/* Detail Header */}
-        <div className={`bg-gray-800 border-b border-gray-700 px-6 py-4 ${isFullWidth ? '' : 'max-w-4xl mx-auto'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={closeTaskDetail}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
-              >
-                <ArrowLeft size={20} />
-              </button>
-              <h1 className="text-xl font-medium text-white">Детали задачи</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsFullWidth(!isFullWidth)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
-                title={isFullWidth ? 'Обычная ширина' : 'Полная ширина'}
-              >
-                {isFullWidth ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-              </button>
-              <button
-                onClick={() => openModal(selectedTask)}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm transition-colors"
-              >
-                Редактировать
-              </button>
-            </div>
-          </div>
-        </div>
+  // ===== Add task
+  const handleAddTask = async () => {
+    const todayIso = new Date().toISOString();
 
-        {/* Detail Content */}
-        <div className={`px-6 py-6 ${isFullWidth ? '' : 'max-w-4xl mx-auto'}`}>
-          <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-            <div className="p-8 space-y-8">
-              {/* Task Header */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  <button
-                    onClick={() => toggleTaskStatus(selectedTask.id)}
-                    className="mt-1 hover:scale-110 transition-transform"
-                  >
-                    <StatusIcon status={selectedTask.status} />
-                  </button>
-                  <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-white mb-4">{selectedTask.name}</h1>
-                    <div className="flex flex-wrap items-center gap-4">
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
-                        <StatusIcon status={selectedTask.status} />
-                        {selectedTask.status}
-                      </span>
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium text-white ${priorityColors[selectedTask.priority]}`}>
-                        <Flag size={14} />
-                        {selectedTask.priority}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+    try {
+      await addTask({
+        title: "Новая задача",
+        content: "Описание",
+        status: "todo",
+        start_date: todayIso,
+        end_date: todayIso,
+      } as ITaskItem);
+    } catch (error) {
+      console.error("Error adding task:", error);
+    }
+  };
 
-              {/* Task Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">Описание</h3>
-                    <div className="bg-gray-700 rounded-lg p-4">
-                      <p className="text-gray-300 leading-relaxed">{selectedTask.description || 'Описание не добавлено'}</p>
-                    </div>
-                  </div>
+  // ===== Format date
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "—";
+    try {
+      return new Date(dateString).toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return "—";
+    }
+  };
 
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">Исполнитель</h3>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium">
-                        {selectedTask.assignee ? selectedTask.assignee.charAt(0) : 'У'}
-                      </div>
-                      <span className="text-gray-300">{selectedTask.assignee || 'Не назначен'}</span>
-                    </div>
-                  </div>
-                </div>
+  // ===== Handle status change
+  const handleStatusChange = async (taskId: string, newStatus: Status) => {
+    setEditValue(newStatus);
+  };
 
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">Даты</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
-                        <Calendar size={16} className="text-gray-400" />
-                        <div>
-                          <div className="text-sm text-gray-400">Дата начала</div>
-                          <div className="text-white">{selectedTask.startDate ? new Date(selectedTask.startDate).toLocaleDateString('ru-RU') : 'Не указана'}</div>
-                        </div>
-                      </div>
-                      <div className={`flex items-center gap-3 p-3 rounded-lg ${isDeadlineNear(selectedTask.endDate) ? 'bg-red-900 border border-red-600' : 'bg-gray-700'}`}>
-                        <Calendar size={16} className={isDeadlineNear(selectedTask.endDate) ? 'text-red-400' : 'text-gray-400'} />
-                        <div>
-                          <div className="text-sm text-gray-400">Срок выполнения</div>
-                          <div className={`font-medium ${isDeadlineNear(selectedTask.endDate) ? 'text-red-400' : 'text-white'}`}>
-                            {selectedTask.endDate ? new Date(selectedTask.endDate).toLocaleDateString('ru-RU') : 'Не указан'}
-                            {isDeadlineNear(selectedTask.endDate) && (
-                              <span className="ml-2 text-xs bg-red-600 px-2 py-1 rounded-full">Скоро</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">Действия</h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => openModal(selectedTask)}
-                        className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
-                      >
-                        Редактировать
-                      </button>
-                      <button
-                        onClick={() => deleteTask(selectedTask.id)}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleStatusEditComplete = async () => {
+    if (!editing || editing.field !== "status") return;
+    await finishEditing();
+  };
 
   return (
-    <div className="min-h-screen bg-gray-900 w-full">
+    <div className="min-h-screen  bg-[#1f1f1f]">
       {/* Header */}
-      <div className=" border-b border-gray-700 px-6 py-4">
-        <div className="max-w-full">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-white">📋 Задачи</h1>
-              <p className="text-gray-400 text-sm mt-1">Управляйте проектами и задачами</p>
-            </div>
+      <div className="border-b border-[#333333]  px-4 md:px-6 py-4 md:py-6">
+        <div className="max-w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
+              📋 <span>Задачи</span>
+            </h1>
+            <p className="text-gray-400 text-sm mt-1">
+              Управляйте проектами и задачами
+            </p>
+          </div>
+
+          {/* Status filter */}
+          <div className="w-full md:w-auto">
+            <Select
+              value={filter}
+              options={filterOptions}
+              onChange={(value) => setFilter(value as Status)}
+              placeholder="Фильтр по статусу"
+              className="w-full md:w-48"
+            />
           </div>
         </div>
       </div>
 
-      {/* Table Container */}
-      <div className="px-6 py-6">
-        <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
-          {/* Table Header */}
-          <div className="bg-gray-750 border-b border-gray-700">
-            <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
-              <div className="col-span-4 flex items-center gap-2">
-                <User size={14} />
-                Название Рутина
+      {/* Main Content */}
+      <div className="px-4 md:px-6 py-4 md:py-6">
+        <div className="bg-[#2a2a2a] backdrop-blur-sm rounded-xl border border-[#3a3a3a]  shadow-xl">
+          {/* Desktop Table Header */}
+          <div className="hidden lg:block bg-[#2a2a2a] border-b border-[#3a3a3a]">
+            <div className="grid grid-cols-12 gap-4 px-4 py-4">
+              <div className="col-span-1 flex items-center justify-center">
+                <Grip size={16} className="text-gray-500" />
               </div>
-
-              <div className="col-span-2 flex items-center gap-2">
-                <Flag size={14} />
-                Status
+              <div className="col-span-4 flex items-center gap-2 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <User size={14} /> Название
               </div>
-              <div className="col-span-2 flex items-center gap-2">
-                <Calendar size={14} />
-                Start date
+              <div className="col-span-2 flex items-center gap-2 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <Flag size={14} /> Статус
               </div>
-              <div className="col-span-2 flex items-center gap-2">
-                <Calendar size={14} />
-                End date
+              <div className="col-span-2 flex items-center gap-2 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <Calendar size={14} /> Начало
               </div>
-              <div className="col-span-1 flex items-center gap-2">
-                <Flag size={14} />
-                Priority
+              <div className="col-span-2 flex items-center gap-2 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <Calendar size={14} /> Конец
               </div>
-
+              <div className="col-span-1 flex items-center justify-center text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <X size={14} />
+              </div>
             </div>
           </div>
 
-          {/* Table Body */}
-          <div className="divide-y divide-gray-700">
-            {filteredTasks.map((task, index) => (
+          {/* Tasks */}
+          <div className="divide-y divide-[#3a3a3a]">
+            {filteredTasks.map((task) => (
               <div
                 key={task.id}
                 draggable
-                onDragStart={(e) => handleDragStart(e, task)}
+                onDragStart={(e) => handleDragStart(e, task.id)}
+                onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, task)}
-                onClick={() => openTaskDetail(task)}
-                className="grid grid-cols-12 gap-4 px-4 py-4 hover:bg-gray-750 transition-colors group cursor-pointer"
+                onDragEnter={(e) => handleDragEnter(e, task.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, task.id)}
+                className={`transition-all duration-200 hover:bg-[#3a3a3a]/40 group cursor-move ${
+                  dragOverTask === task.id
+                    ? "bg-blue-500/10 border-y-2 border-blue-500/50"
+                    : ""
+                } ${draggedTask?.id === task.id ? "opacity-50" : ""}`}
               >
-                {/* Task Name */}
-                <div className="col-span-4 flex items-start gap-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTaskStatus(task.id);
-                    }}
-                    className="mt-0.5 hover:scale-110 transition-transform"
-                  >
-                    <StatusIcon status={task.status} />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white font-medium hover:text-blue-400 transition-colors cursor-pointer">
-                      {task.name}
+                {/* Desktop Layout */}
+                <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-4 items-center">
+                  {/* Drag Handle */}
+                  <div className="col-span-1 flex items-center justify-center">
+                    <Grip
+                      size={16}
+                      className="text-gray-500 group-hover:text-gray-400 transition-colors"
+                    />
+                  </div>
+
+                  {/* Title */}
+                  <div className="col-span-4 min-w-0">
+                    {editing?.id === task.id && editing.field === "title" ? (
+                      <input
+                        className="w-full h-10 bg-gray-800/90 backdrop-blur-sm text-white px-3 rounded-lg border border-gray-600/50 outline-none focus:border-blue-500 transition-colors"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={finishEditing}
+                        onKeyDown={onEditKeyDown}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        onClick={() =>
+                          startEditing(task.id, "title", task.title)
+                        }
+                        className="text-white font-medium truncate hover:text-blue-300 transition-colors cursor-pointer p-2 rounded min-h-[2.5rem] flex items-center"
+                      >
+                        {task.title}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div className="col-span-2">
+                    {editing?.id === task.id && editing.field === "status" ? (
+                      <Select
+                        value={task.status}
+                        options={statusOptions}
+                        onChange={(value) =>
+                          handleStatusChange(task.id, value as Status)
+                        }
+                        isEditing={true}
+                      />
+                    ) : (
+                      <button
+                        onClick={() =>
+                          startEditing(task.id, "status", task.status)
+                        }
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-white transition-all hover:scale-105 ${
+                          statusConfig[task.status].color
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            statusConfig[task.status].dotColor
+                          }`}
+                        />
+                        {statusConfig[task.status].label}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Start Date */}
+                  <div className="col-span-2">
+                    {editing?.id === task.id &&
+                    editing.field === "start_date" ? (
+                      <input
+                        type="date"
+                        className="w-full h-10 bg-gray-800/90 backdrop-blur-sm text-white px-3 rounded-lg border border-gray-600/50 outline-none focus:border-blue-500 transition-colors"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={finishEditing}
+                        onKeyDown={onEditKeyDown}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        onClick={() =>
+                          startEditing(task.id, "start_date", task.start_date)
+                        }
+                        className="text-gray-300 text-sm hover:text-blue-300 transition-colors cursor-pointer p-2 rounded min-h-[2.5rem] flex items-center"
+                      >
+                        {formatDate(task.start_date)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* End Date */}
+                  <div className="col-span-2">
+                    {editing?.id === task.id && editing.field === "end_date" ? (
+                      <input
+                        type="date"
+                        className="w-full h-10 bg-gray-800/90 backdrop-blur-sm text-white px-3 rounded-lg border border-gray-600/50 outline-none focus:border-blue-500 transition-colors"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={finishEditing}
+                        onKeyDown={onEditKeyDown}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        onClick={() =>
+                          startEditing(task.id, "end_date", task.end_date)
+                        }
+                        className="text-gray-300 text-sm hover:text-blue-300 transition-colors cursor-pointer p-2 rounded min-h-[2.5rem] flex items-center"
+                      >
+                        {formatDate(task.end_date)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Delete */}
+                  <div className="col-span-1 flex justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteTask(task.id);
+                      }}
+                      className="text-gray-500 hover:text-red-400 transition-colors p-1 rounded-full hover:bg-red-500/10"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mobile Layout */}
+                <div className="lg:hidden p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 mr-3">
+                      {editing?.id === task.id && editing.field === "title" ? (
+                        <input
+                          className="w-full h-10 bg-gray-800/90 backdrop-blur-sm text-white px-3 rounded-lg border border-gray-600/50 outline-none focus:border-blue-500 transition-colors"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={finishEditing}
+                          onKeyDown={onEditKeyDown}
+                          autoFocus
+                        />
+                      ) : (
+                        <h3
+                          onClick={() =>
+                            startEditing(task.id, "title", task.title)
+                          }
+                          className="text-white font-medium text-lg leading-tight hover:text-blue-300 transition-colors cursor-pointer"
+                        >
+                          {task.title}
+                        </h3>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Grip size={16} className="text-gray-500" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTask(task.id);
+                        }}
+                        className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {/* Status */}
+                    <div>
+                      {editing?.id === task.id && editing.field === "status" ? (
+                        <Select
+                          value={editValue}
+                          options={statusOptions}
+                          onChange={(value) =>
+                            handleStatusChange(task.id, value as Status)
+                          }
+                          onComplete={handleStatusEditComplete}
+                          isEditing={true}
+                        />
+                      ) : (
+                        <button
+                          onClick={() =>
+                            startEditing(task.id, "status", task.status)
+                          }
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-white transition-all hover:scale-105 ${
+                            statusConfig[task.status].color
+                          }`}
+                        >
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              statusConfig[task.status].dotColor
+                            }`}
+                          />
+                          {statusConfig[task.status].label}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dates */}
+                    <div className="flex flex-col sm:flex-row gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Calendar size={14} />
+                        <span>Начало:</span>
+                        {editing?.id === task.id &&
+                        editing.field === "start_date" ? (
+                          <input
+                            type="date"
+                            className="bg-gray-800/90 backdrop-blur-sm text-white px-2 py-1 rounded border border-gray-600/50 outline-none focus:border-blue-500 transition-colors text-xs"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={finishEditing}
+                            onKeyDown={onEditKeyDown}
+                            autoFocus
+                          />
+                        ) : (
+                          <span
+                            onClick={() =>
+                              startEditing(
+                                task.id,
+                                "start_date",
+                                task.start_date
+                              )
+                            }
+                            className="text-gray-300 hover:text-blue-300 transition-colors cursor-pointer"
+                          >
+                            {formatDate(task.start_date)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Calendar size={14} />
+                        <span>Конец:</span>
+                        {editing?.id === task.id &&
+                        editing.field === "end_date" ? (
+                          <input
+                            type="date"
+                            className="bg-gray-800/90 backdrop-blur-sm text-white px-2 py-1 rounded border border-gray-600/50 outline-none focus:border-blue-500 transition-colors text-xs"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={finishEditing}
+                            onKeyDown={onEditKeyDown}
+                            autoFocus
+                          />
+                        ) : (
+                          <span
+                            onClick={() =>
+                              startEditing(task.id, "end_date", task.end_date)
+                            }
+                            className="text-gray-300 hover:text-blue-300 transition-colors cursor-pointer"
+                          >
+                            {formatDate(task.end_date)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-
-
-
-                {/* Status */}
-                <div className="col-span-2 flex items-center">
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusColors[task.status]}`}>
-                    {task.status}
-                  </span>
-                </div>
-
-                {/* Start Date */}
-                <div className="col-span-2 flex items-center text-gray-300 text-sm">
-                  <div className="flex items-center gap-1">
-                    <Calendar size={14} className="text-gray-400" />
-                    {task.startDate ? new Date(task.startDate).toLocaleDateString('ru-RU') : '—'}
-                  </div>
-                </div>
-                {/* end Date */}
-                <div className="col-span-2 flex items-center text-gray-300 text-sm">
-                  <div className="flex items-center gap-1">
-                    <Calendar size={14} className="text-gray-400" />
-                    {task.startDate ? new Date(task.endDate).toLocaleDateString('ru-RU') : '—'}
-                  </div>
-                </div>
-
-                {/* Priority */}
-                <div className="col-span-1 flex items-center">
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white ${priorityColors[task.priority]}`}>
-                    {task.priority}
-                  </span>
-                </div>
-
               </div>
             ))}
-          </div>
 
-          {/* Empty State */}
-          {filteredTasks.length === 0 && (
-            <div className="px-4 py-12 text-center">
-              <div className="text-gray-500 text-sm">
-                {searchTerm || statusFilter !== 'Все статусы' || priorityFilter !== 'Все приоритеты' || deadlineFilter !== 'Все сроки'
-                  ? 'Задачи не найдены по заданным критериям'
-                  : 'Пока нет задач. Создайте первую задачу!'}
+            {/* Empty state */}
+            {filteredTasks.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <Flag size={48} className="mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Задач не найдено</p>
+                <p className="text-sm mt-1">
+                  {filter === "all"
+                    ? "Добавьте свою первую задачу"
+                    : `Нет задач со статусом "${
+                        statusConfig[filter as Status]?.label
+                      }"`}
+                </p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Add New Row */}
+        {/* Add New Task Button */}
         <button
-          onClick={() => openModal()}
-          className="mt-2 w-full px-4 py-3 text-left text-gray-400 hover:text-gray-300 hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2 text-sm"
+          onClick={handleAddTask}
+          className="mt-4 w-full px-4 py-4 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-xl transition-all duration-200 flex items-center justify-center gap-3 text-sm font-medium border-2 border-dashed border-[#3a3a3a] hover:border-gray-600/50 group"
         >
-          <Plus size={16} />
+          <Plus
+            size={20}
+            className="group-hover:rotate-90 transition-transform duration-200"
+          />
           Добавить задачу
         </button>
       </div>
-
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg w-full max-w-2xl border border-gray-700 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-700">
-              <h2 className="text-xl font-semibold text-white">
-                {editingTask ? 'Редактировать задачу' : 'Новая задача'}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-white text-2xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-6">
-              {/* Task Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Название задачи</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="Добавьте описание..."
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              {/* Form Grid */}
-              <div className="grid grid-cols-2 gap-6">
-                {/* Assignee */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Исполнитель</label>
-                  <input
-                    type="text"
-                    value={formData.assignee}
-                    onChange={(e) => setFormData({...formData, assignee: e.target.value})}
-                    placeholder="Назначить исполнителя..."
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Статус</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value})}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Не начато">Не начато</option>
-                    <option value="В работе">В работе</option>
-                    <option value="Завершено">Завершено</option>
-                  </select>
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Приоритет</label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData({...formData, priority: e.target.value})}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Низкий">Низкий</option>
-                    <option value="Средний">Средний</option>
-                    <option value="Высокий">Высокий</option>
-                  </select>
-                </div>
-
-
-
-                {/* Start Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Дата начала</label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* End Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Срок выполнения</label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-700">
-              <button
-                onClick={closeModal}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
-              >
-                {editingTask ? 'Сохранить' : 'Создать'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

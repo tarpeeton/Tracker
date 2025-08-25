@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-
 /* Dark mode variant */
 @custom-variant dark (&:is(.dark *));
 
@@ -178,4 +177,8 @@
 
 .custom-select__option--is-focused {
   background-color: #4b5563 !important; /* hover gray */
+}
+
+.ck-toolbar__items {
+  background-color: black !important;
 }

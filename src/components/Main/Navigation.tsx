@@ -19,7 +19,7 @@ export const NavigationBar = () => {
 
   return (
     <nav
-      className={`flex flex-col min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-2xl transition-all duration-300 ${
+      className={`flex flex-col min-h-screen bg-[#2b2a2a] text-white shadow-2xl transition-all duration-300 ${
         sideBar ? "w-[260px]" : "w-[80px]"
       }`}
     >
