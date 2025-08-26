@@ -279,7 +279,7 @@ const formatOutput = (date: Date): T => {
           disabled={disabled}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           className={`
-            w-full px-4 py-2.5 pr-10 bg-inherit border border-gray-300 rounded-lg
+            w-full px-4 py-2.5 pr-10 bg-inherit border  rounded-lg
             focus:ring-1 focus:ring-blue-500 focus:border-blue-500
             transition-colors duration-200
             ${

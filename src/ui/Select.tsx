@@ -60,7 +60,7 @@ export const Select: React.FC<{
       // Даем небольшую задержку чтобы изменение успело применится
       setTimeout(() => {
         onComplete();
-      }, 50);
+      }, 100);
     }
   };
 
@@ -75,7 +75,7 @@ export const Select: React.FC<{
       <button
         type="button"
         onClick={handleToggle}
-        className="w-full h-10 backdrop-blur-sm text-white px-3 rounded-lg border border-gray-600/50 flex items-center justify-between hover:border-gray-500 transition-colors"
+        className="w-full h-10 backdrop-blur-sm text-white px-3 rounded-lg border flex items-center justify-between  transition-colors"
       >
         <div className="flex items-center gap-2">
           {selectedOption?.color && (

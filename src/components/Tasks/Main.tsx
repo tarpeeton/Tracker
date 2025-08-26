@@ -7,8 +7,9 @@ import {
 import { ITaskItem, TaskStore } from "@/store/TaskStore";
 import { UserStore } from "@/store/UserStore";
 import { Select } from "@/ui/Select";
-import { Calendar, Flag, Grip, Plus, User, X } from "lucide-react";
+import { Calendar, Flag, Grip, Plus, User, X, Eye } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 export type Status = "todo" | "in_progress" | "done" | "blocked";
 
@@ -69,7 +70,6 @@ export const MainTask: React.FC = () => {
     if (field === "status") {
       return value as Status;
     }
-    debugger;
 
     return value;
   };
@@ -110,7 +110,7 @@ export const MainTask: React.FC = () => {
     }
   };
 
-  // ===== Drag & drop
+  // ===== Drag & drop with improved logic
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     // Если редактируем, завершаем редактирование
     if (editing) {
@@ -119,16 +119,10 @@ export const MainTask: React.FC = () => {
 
     setDraggedTask({ id: taskId });
     e.dataTransfer.effectAllowed = "move";
-    // Добавляем визуальный эффект
-    const target = e.currentTarget as HTMLElement;
-    target.style.opacity = "0.5";
+    e.dataTransfer.setData("text/plain", taskId);
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
-    // Восстанавливаем визуальный эффект
-    const target = e.currentTarget as HTMLElement;
-    target.style.opacity = "1";
-
     setDraggedTask(null);
     setDragOverTask(null);
   };
@@ -146,12 +140,11 @@ export const MainTask: React.FC = () => {
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
+    // Более точная проверка покидания элемента
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    const currentTarget = e.currentTarget as HTMLElement;
 
-    // Проверяем, действительно ли мышь покинула элемент
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+    if (!currentTarget.contains(relatedTarget)) {
       setDragOverTask(null);
     }
   };
@@ -160,33 +153,49 @@ export const MainTask: React.FC = () => {
     e.preventDefault();
     setDragOverTask(null);
 
-    if (!draggedTask || draggedTask.id === targetId) return;
+    const draggedId = e.dataTransfer.getData("text/plain") || draggedTask?.id;
 
-    const list = filteredTasks.length ? filteredTasks : tasks;
-    const fromIndex = list.findIndex((t) => t.id === draggedTask.id);
-    const toIndex = list.findIndex((t) => t.id === targetId);
+    if (!draggedId || draggedId === targetId) {
+      setDraggedTask(null);
+      return;
+    }
 
-    if (fromIndex === -1 || toIndex === -1) return;
+    // Используем актуальный список для расчета позиций
+    const currentList = filteredTasks.length ? filteredTasks : tasks;
+    const sortedList = [...currentList].sort((a, b) => (a.order || 0) - (b.order || 0));
 
-    const movingUp = fromIndex > toIndex;
-    const target = list[toIndex];
+    const fromIndex = sortedList.findIndex((t) => t.id === draggedId);
+    const toIndex = sortedList.findIndex((t) => t.id === targetId);
 
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedTask(null);
+      return;
+    }
+
+    // Улучшенная логика расчета новой позиции
     let newOrder: number;
-    if (movingUp) {
-      const prev = list[toIndex - 1]?.order ?? target.order - 1;
-      newOrder = (prev + target.order) / 2;
+
+    if (fromIndex < toIndex) {
+      // Перемещение вниз
+      const nextTask = sortedList[toIndex + 1];
+      const targetOrder = sortedList[toIndex].order || 0;
+      const nextOrder = nextTask ? (nextTask.order || 0) : targetOrder + 1000;
+      newOrder = targetOrder + (nextOrder - targetOrder) / 2;
     } else {
-      const next = list[toIndex + 1]?.order ?? target.order + 1;
-      newOrder = (target.order + next) / 2;
+      // Перемещение вверх
+      const prevTask = sortedList[toIndex - 1];
+      const targetOrder = sortedList[toIndex].order || 0;
+      const prevOrder = prevTask ? (prevTask.order || 0) : targetOrder - 1000;
+      newOrder = prevOrder + (targetOrder - prevOrder) / 2;
     }
 
     try {
-      await dragTask(draggedTask.id, newOrder);
+      await dragTask(draggedId, newOrder);
     } catch (error) {
       console.error("Error reordering task:", error);
+    } finally {
+      setDraggedTask(null);
     }
-
-    setDraggedTask(null);
   };
 
   // ===== Add task
@@ -221,8 +230,15 @@ export const MainTask: React.FC = () => {
   };
 
   // ===== Handle status change
-  const handleStatusChange = async (taskId: string, newStatus: Status) => {
-    setEditValue(newStatus);
+  const handleStatusChange = async (id: string, newStatus: Status) => {
+    try {
+      await editTask(id, { status: newStatus });
+    } catch (error) {
+      console.error("Error updating status:", error);
+    } finally {
+      setEditing(null);
+      setEditValue("");
+    }
   };
 
   const handleStatusEditComplete = async () => {
@@ -230,10 +246,15 @@ export const MainTask: React.FC = () => {
     await finishEditing();
   };
 
+  // Sorted tasks for proper display
+  const displayTasks = useMemo(() => {
+    return [...filteredTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [filteredTasks]);
+
   return (
-    <div className="min-h-screen  bg-[#1f1f1f]">
+    <div className="min-h-screen bg-[#1f1f1f]">
       {/* Header */}
-      <div className="border-b border-[#333333]  px-4 md:px-6 py-4 md:py-6">
+      <div className="border-b border-[#333333] px-4 md:px-6 py-4 md:py-6">
         <div className="max-w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
@@ -259,10 +280,10 @@ export const MainTask: React.FC = () => {
 
       {/* Main Content */}
       <div className="px-4 md:px-6 py-4 md:py-6">
-        <div className="bg-[#2a2a2a] backdrop-blur-sm rounded-xl border border-[#3a3a3a]  shadow-xl">
+        <div className="bg-[#2a2a2a] backdrop-blur-sm rounded-xl border border-[#3a3a3a] shadow-xl">
           {/* Desktop Table Header */}
           <div className="hidden lg:block bg-[#2a2a2a] border-b border-[#3a3a3a]">
-            <div className="grid grid-cols-12 gap-4 px-4 py-4">
+            <div className="grid grid-cols-13 gap-4 px-4 py-4">
               <div className="col-span-1 flex items-center justify-center">
                 <Grip size={16} className="text-gray-500" />
               </div>
@@ -281,34 +302,46 @@ export const MainTask: React.FC = () => {
               <div className="col-span-1 flex items-center justify-center text-xs font-medium text-gray-400 uppercase tracking-wider">
                 <X size={14} />
               </div>
+              <div className="col-span-1 flex items-center justify-center text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <Eye size={14} />
+              </div>
             </div>
           </div>
 
           {/* Tasks */}
           <div className="divide-y divide-[#3a3a3a]">
-            {filteredTasks.map((task) => (
+            {displayTasks.map((task, index) => (
               <div
-                key={task.id}
-                draggable
+                key={`${task.id}-${index}`}
+                draggable={!editing}
                 onDragStart={(e) => handleDragStart(e, task.id)}
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
                 onDragEnter={(e) => handleDragEnter(e, task.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, task.id)}
-                className={`transition-all duration-200 hover:bg-[#3a3a3a]/40 group cursor-move ${
+                className={`transition-all duration-200 hover:bg-[#3a3a3a]/40 group ${
+                  !editing ? 'cursor-move' : 'cursor-default'
+                } ${
                   dragOverTask === task.id
                     ? "bg-blue-500/10 border-y-2 border-blue-500/50"
                     : ""
-                } ${draggedTask?.id === task.id ? "opacity-50" : ""}`}
+                } ${draggedTask?.id === task.id ? "opacity-50 transform scale-[0.98]" : ""}`}
+                style={{
+                  userSelect: editing ? 'text' : 'none',
+                }}
               >
                 {/* Desktop Layout */}
-                <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-4 items-center">
+                <div className="hidden lg:grid grid-cols-13 gap-4 px-4 py-4 items-center">
                   {/* Drag Handle */}
                   <div className="col-span-1 flex items-center justify-center">
                     <Grip
                       size={16}
-                      className="text-gray-500 group-hover:text-gray-400 transition-colors"
+                      className={`transition-colors ${
+                        editing
+                          ? 'text-gray-600 cursor-not-allowed'
+                          : 'text-gray-500 group-hover:text-gray-400 cursor-grab active:cursor-grabbing'
+                      }`}
                     />
                   </div>
 
@@ -426,6 +459,14 @@ export const MainTask: React.FC = () => {
                       <X size={16} />
                     </button>
                   </div>
+                  <div className="col-span-1 flex justify-center">
+                    <Link
+                      href={`/tasks/${task.id}`}
+                      className="text-gray-500 hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-blue-500/10"
+                    >
+                      <Eye size={18} />
+                    </Link>
+                  </div>
                 </div>
 
                 {/* Mobile Layout */}
@@ -453,7 +494,14 @@ export const MainTask: React.FC = () => {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Grip size={16} className="text-gray-500" />
+                      <Grip
+                        size={16}
+                        className={`${
+                          editing
+                            ? 'text-gray-600 cursor-not-allowed'
+                            : 'text-gray-500 cursor-grab active:cursor-grabbing'
+                        }`}
+                      />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -561,7 +609,7 @@ export const MainTask: React.FC = () => {
             ))}
 
             {/* Empty state */}
-            {filteredTasks.length === 0 && (
+            {displayTasks.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <Flag size={48} className="mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">Задач не найдено</p>

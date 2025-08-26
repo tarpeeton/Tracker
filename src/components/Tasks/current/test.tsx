@@ -140,14 +140,14 @@ export const NotionTaskEditor: React.FC = () => {
 
   if (loading)
     return (
-      <div className="w-full h-full flex items-center justify-center text-gray-500">
+      <div className="w-full h-full flex items-center justify-center text-gray-500 bg-[#1f1f1f]">
         Loading task...
       </div>
     );
 
   if (!task)
     return (
-      <div className="w-full h-full flex items-center justify-center text-gray-500">
+      <div className="w-full h-full flex items-center justify-center text-gray-500 bg-[#1f1f1f]">
         Task not found
       </div>
     );
