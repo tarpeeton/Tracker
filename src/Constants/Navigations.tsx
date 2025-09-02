@@ -1,4 +1,4 @@
-import { Home, User, Settings, List, FileText } from "lucide-react";
+import { Home, User, Settings, List, FileText ,Image } from "lucide-react";
 
 export const NAVIGATIONS = [
   {
@@ -7,18 +7,18 @@ export const NAVIGATIONS = [
     name: "Главная",
     url: "/",
   },
-  {
-    id: "2",
-    icon: User,
-    name: "Профиль",
-    url: "/profile",
-  },
-  {
-    id: "3",
-    icon: Settings,
-    name: "Настройки",
-    url: "/settings",
-  },
+  // {
+  //   id: "2",
+  //   icon: User,
+  //   name: "Профиль",
+  //   url: "/profile",
+  // },
+  // {
+  //   id: "3",
+  //   icon: Settings,
+  //   name: "Настройки",
+  //   url: "/settings",
+  // },
   {
     id: "4",
     icon: List,
@@ -26,9 +26,15 @@ export const NAVIGATIONS = [
     url: "/tasks",
   },
   {
-    id: "5",
-    icon: FileText,
-    name: "Материалы",
-    url: "/materials",
+    id: "6",
+    icon: Image,
+    name: "Галерея",
+    url: "/gallery",
   },
+  // {
+  //   id: "5",
+  //   icon: FileText,
+  //   name: "Материалы",
+  //   url: "/materials",
+  // },
 ];
