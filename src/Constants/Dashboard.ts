@@ -2,18 +2,18 @@ import { scaleOrdinal } from "d3-scale";
 import { schemeTableau10, schemeSet3 } from "d3-scale-chromatic";
 
   export const MONTHS = [
-    "Январь",
-    "Февраль",
+    "Янв",
+    "Фев",
     "Март",
-    "Апрель",
+    "Ап",
     "Май",
     "Июнь",
     "Июль",
-    "Август",
-    "Сентябрь",
-    "Октябрь",
-    "Ноябрь",
-    "Декабрь",
+    "Ав",
+    "Сен",
+    "Ок",
+    "Но",
+    "Дек",
   ];
 
 
@@ -24,6 +24,3 @@ export const COLORS = scaleOrdinal([...schemeTableau10, ...schemeSet3]).range();
    category: `Категория ${index + 1}`,
    price: 1,
  }));
-
-
-export  const WEEK_DAYS = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];

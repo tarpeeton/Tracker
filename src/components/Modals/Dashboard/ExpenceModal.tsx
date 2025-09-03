@@ -1,36 +1,33 @@
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useCallback, useState } from "react";
 import Select from "react-select";
 import { X } from "lucide-react";
-import { IGoals } from "@/store/Dashboard";
-
-interface Expence {
-  price: number;
-  category: string;
-  goalID: string;
-  date: string;
-}
-
-
+import { DashboardStore, IGoals } from "@/store/Dashboard";
 
 interface IexpenceModal {
   setExpenseModal: Dispatch<SetStateAction<boolean>>;
-  setExpenceState: Dispatch<SetStateAction<Expence>>;
-  createExpence: () => void;
-  expenceState: Expence;
-  goals: IGoals[]
+  goals: IGoals[];
 }
 
+export const ExpenceModal = ({ setExpenseModal, goals }: IexpenceModal) => {
+  const { addExpence } = DashboardStore();
+  const [expenceState, setExpenceState] = useState({
+    price: 0,
+    category: "",
+    goalID: "",
+    date: "",
+  });
 
+  const createExpence = useCallback(() => {
+    addExpence(
+      expenceState.price,
+      expenceState.category,
+      expenceState.date,
+      expenceState.goalID
+    );
+    setExpenseModal(false);
+    setExpenceState({ price: 0, category: "", goalID: "", date: "" });
+  }, [expenceState, addExpence, setExpenseModal]);
 
-
-
-export const ExpenceModal = ({
-  setExpenseModal,
-  setExpenceState,
-  expenceState,
-  createExpence,
-  goals,
-}: IexpenceModal) => {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-gray-800 p-6 rounded-lg w-96 relative shadow-lg">
@@ -46,14 +43,14 @@ export const ExpenceModal = ({
         <div className="flex flex-col gap-4">
           <input
             type="text"
-            value={expenceState.price}
+            value={expenceState.price === 0 ? "" : expenceState.price}
             onChange={(e) => {
               const val = e.target.value;
               if (/^\d*$/.test(val)) {
-                setExpenceState({
-                  ...expenceState,
+                setExpenceState((prev) => ({
+                  ...prev,
                   price: val === "" ? 0 : Number(val),
-                });
+                }));
               }
             }}
             placeholder="Сумма"
@@ -72,6 +69,7 @@ export const ExpenceModal = ({
             placeholder="Категория"
             className="p-2 rounded bg-gray-700 text-white border border-gray-600"
           />
+
           <Select
             options={goals.map((g) => ({ value: g.id, label: g.name }))}
             onChange={(selected) =>
@@ -82,6 +80,7 @@ export const ExpenceModal = ({
             }
             classNamePrefix="custom-select"
           />
+
           <input
             type="date"
             value={expenceState.date}
@@ -93,6 +92,7 @@ export const ExpenceModal = ({
             }
             className="p-2 rounded bg-gray-700 text-white border border-gray-600"
           />
+
           <button
             onClick={createExpence}
             className="bg-red-500 hover:bg-red-400 text-white p-2 rounded font-semibold"

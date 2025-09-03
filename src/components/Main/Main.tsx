@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -7,6 +7,7 @@ import {
   Plus,
   Wallet,
   Gift,
+  X
 } from "lucide-react";
 import {
   BarChart,
@@ -19,124 +20,78 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { DashboardStore } from "@/store/Dashboard";
-import { MONTHS, COLORS, DUMMY_DATA, WEEK_DAYS } from "@/Constants/Dashboard";
+import {COLORS, DUMMY_DATA } from "@/Constants/Dashboard";
 import { IncomeModal } from "../Modals/Dashboard/IncomeModal";
 import { ExpenceModal } from "../Modals/Dashboard/ExpenceModal";
 import { GoalModal } from "../Modals/Dashboard/GoalModal";
 import { UserStore } from "@/store/UserStore";
+import { useChartData } from "@/hooks/useChartData";
+
+
+
 
 export const Main = () => {
   const [incomeModal, setIncomeModal] = useState(false);
   const [expenseModal, setExpenseModal] = useState(false);
   const [goalModal, setGoalModal] = useState(false);
+
   const { user } = UserStore();
   const {
-    addBalance,
     currentBalance,
-    addExpence,
     expences,
-    addGoal,
     goals,
     totalExpence,
     totalProfit,
     balanceHistory,
     initialize,
+    deleteGoal,
   } = DashboardStore();
 
   useEffect(() => {
     if (user.user_id) {
       initialize();
     }
-  }, [user]);
-
-  const [balance, setBalance] = useState({ price: 0, date: "" });
-  const [expenceState, setExpenceState] = useState({
-    price: 0,
-    category: "",
-    goalID: "",
-    date: "",
-  });
-  const [goalState, setGoalState] = useState({ price: 0, name: "" });
-  const transFormedData = expences.map((item) => ({
-    price: item.price,
-    category: item.category,
-  }));
-
-  const currentMonthIndex = new Date().getMonth();
-  const monthlyIncomes: number[] = new Array(12).fill(0);
-
-  if (balanceHistory && balanceHistory.length > 0) {
-    balanceHistory.forEach((b) => {
-      if (b.date) {
-        const [datePart, timePart] = b.date.split(", ");
-        const [day, month, year] = datePart.split(".").map(Number);
-        const [hours, minutes, seconds] = timePart.split(":").map(Number);
-
-        const jsDate = new Date(year, month - 1, day, hours, minutes, seconds);
-        const monthIndex = jsDate.getMonth();
-
-        monthlyIncomes[monthIndex] += b.price;
-      }
-    });
-  }
+  }, [user.user_id, initialize]);
 
 
-  const chartData = MONTHS.map((month, index) => {
-    return {
-      month,
-      income: monthlyIncomes[index],
-      isCurrent: index === currentMonthIndex,
-    };
-  });
+
+  const transformedExpenseData = useMemo(() => {
+    return expences.map((item) => ({
+      price: item.price,
+      category: item.category,
+    }));
+  }, [expences]);
 
 
-  const handleBalanceCreate = () => {
-    addBalance(balance.price, balance.date);
+  // Modal handlers
+  const handleIncomeModalOpen = useCallback(() => setIncomeModal(true), []);
+  const handleExpenseModalOpen = useCallback(() => setExpenseModal(true), []);
+  const handleGoalModalOpen = useCallback(() => setGoalModal(true), []);
+
+  const handleIncomeModalClose = useCallback(() => {
     setIncomeModal(false);
-  };
+  }, []);
 
-  const createExpence = () => {
-    addExpence(
-      expenceState.price,
-      expenceState.category,
-      expenceState.date,
-      expenceState.goalID
-    );
+  const handleExpenseModalClose = useCallback(() => {
     setExpenseModal(false);
-  };
+  }, []);
 
-  const createGoals = () => {
-    addGoal(goalState.price, goalState.name);
+  const handleGoalModalClose = useCallback(() => {
     setGoalModal(false);
-  };
-const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
-  const total = expences.reduce((sum, e) => {
-    if (!e.date) return sum;
+  }, []);
 
-    try {
-      // "dd.MM.yyyy, HH:mm:ss" formatini parse qilish
-      const [datePart, timePart] = e.date.split(", ");
-      const [day, month, year] = datePart.split(".").map(Number);
-      const [hours, minutes, seconds] = timePart.split(":").map(Number);
+  const goalsWithProgress = useMemo(() => {
+    return goals.map((goal) => ({
+      ...goal,
+      percent: Math.floor((goal.balance / goal.price) * 100),
+    }));
+  }, [goals]);
 
-      const jsDate = new Date(year, month - 1, day, hours, minutes, seconds);
 
-      // WEEK_DAYS Sunday = 0, Monday = 1 ... bo‘lsa moslash
-      const dayIndex = jsDate.getDay();
+  const chartData = useChartData(balanceHistory);
 
-      if (dayIndex === idx) {
-        return sum + e.price;
-      }
-    } catch (err) {
-      console.warn("Invalid date format:", e.date);
-      return sum; // noto‘g‘ri date ni o'tkazib yuboradi
-    }
 
-    return sum;
-  }, 0);
 
-  return { day: dayName, value: total };
-});
 
 
   return (
@@ -188,7 +143,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
       {/* Action Buttons */}
       <div className="flex flex-col lg:flex-row gap-6 mb-16">
         <button
-          onClick={() => setIncomeModal(true)}
+          onClick={handleIncomeModalOpen}
           className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-500 transition duration-200 rounded-lg px-6 py-4 text-white font-semibold shadow-md"
         >
           <Plus className="w-5 h-5" />
@@ -196,7 +151,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
         </button>
 
         <button
-          onClick={() => setExpenseModal(true)}
+          onClick={handleExpenseModalOpen}
           className="flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 transition duration-200 rounded-lg px-6 py-4 text-white font-semibold shadow-md"
         >
           <Wallet className="w-5 h-5" />
@@ -204,7 +159,7 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
         </button>
 
         <button
-          onClick={() => setGoalModal(true)}
+          onClick={handleGoalModalOpen}
           className="flex items-center justify-center gap-3 bg-yellow-600 hover:bg-yellow-500 transition duration-200 rounded-lg px-6 py-4 text-white font-semibold shadow-md"
         >
           <Gift className="w-5 h-5" />
@@ -217,8 +172,11 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
         <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md">
           <h2 className="text-white mb-5 text-lg font-semibold">Доход</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <XAxis dataKey="month" stroke="#fff" />
+            <BarChart
+              data={chartData}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              <XAxis dataKey="month" stroke="#fff" tick={{ fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#000",
@@ -226,28 +184,12 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
                   borderRadius: 8,
                 }}
                 itemStyle={{ color: "#fff" }}
+                formatter={(value: number) => [
+                  `${value.toLocaleString()} сом`,
+                  "Доход",
+                ]}
               />
-              <Bar
-                dataKey="income"
-                shape={(props) => {
-                  const { x, y, width, height, payload } = props;
-                  const income = payload.income;
-                  // agar income = 0 bo'lsa balandligi minimal bo'lsin
-                  const displayHeight = income === 0 ? 100 : height;
-                  const displayY = income === 0 ? y - 100 : y;
-
-                  return (
-                    <rect
-                      x={x}
-                      y={displayY}
-                      width={width}
-                      height={displayHeight}
-                      fill={income === 0 ? "#7D8D86" : "#22c55e"}
-                      rx={6}
-                    />
-                  );
-                }}
-              />
+              <Bar dataKey="income" fill="#8884d8" isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -260,13 +202,16 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
             <PieChart>
               <Pie
                 data={
-                  expences && expences.length > 0 ? transFormedData : DUMMY_DATA
+                  expences && expences.length > 0
+                    ? transformedExpenseData
+                    : DUMMY_DATA
                 }
                 dataKey="price"
                 nameKey="category"
                 innerRadius={50}
                 outerRadius={100}
                 paddingAngle={5}
+                isAnimationActive={false}
               >
                 {(expences && expences.length > 0 ? expences : DUMMY_DATA).map(
                   (_, index) => (
@@ -290,52 +235,34 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
         </div>
       </div>
 
-      {/* Daily Heatmap */}
-      <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md mb-16">
-        <h2 className="text-white mb-5 text-lg font-semibold">
-          Ежедневные расходы
-        </h2>
-        <div className="grid grid-cols-7 gap-2">
-          {dailyExpenses.map((day, idx) => {
-            const intensity = Math.min(day.value / 200000, 1);
-            const bgColor = `rgba(239, 68, 68, ${intensity})`;
-            return (
-              <div
-                key={idx}
-                className="p-4 text-center rounded-md text-white font-semibold"
-                style={{ backgroundColor: bgColor }}
-              >
-                {day.day}
-                <div className="text-sm mt-1">
-                  {day.value.toLocaleString()} сом
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Active Goals Section */}
       <div className="bg-[#2b2a2a] p-5 rounded-lg shadow-md mb-16">
         <h2 className="text-white mb-5 text-lg font-semibold">Активные цели</h2>
-        {goals.map((goal, idx) => {
-          const percent = Math.floor((goal.balance / goal.price) * 100);
-          return (
-            <div key={idx} className="mb-5">
-              <p className="text-white font-semibold mb-1">{goal.name}</p>
-              <div className="w-full bg-gray-700 rounded-full h-6 mb-2">
-                <div
-                  className="bg-yellow-500 h-6 rounded-full transition-all duration-500"
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-              <p className="text-white text-sm">
-                {goal.balance.toLocaleString()} из {goal.price.toLocaleString()}{" "}
-                сом ({percent}%)
-              </p>
+        {goalsWithProgress.map((goal, idx) => (
+          <div key={`goal-${goal.name}-${idx}`} className="mb-5">
+            <div className="flex flex-row items-center justify-between mb-4">
+              <p className="text-white font-semibold">{goal.name}</p>
+              <button
+                onClick={() => deleteGoal(goal.id)}
+                className="flex items-center justify-center w-8 h-8 rounded-lg border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-colors duration-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          );
-        })}
+
+            <div className="w-full bg-gray-700 rounded-full h-6 mb-2 overflow-hidden">
+              <div
+                className="bg-yellow-500 h-6 rounded-full transition-all duration-500"
+                style={{ width: `${goal.percent}%` }}
+              />
+            </div>
+
+            <p className="text-white text-sm">
+              {goal.balance.toLocaleString()} из {goal.price.toLocaleString()}{" "}
+              сом ({goal.percent}%)
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* History Section */}
@@ -343,55 +270,41 @@ const dailyExpenses = WEEK_DAYS.map((dayName, idx) => {
         <h2 className="text-white mb-5 text-lg font-semibold">
           История транзакций
         </h2>
-        <table className="w-full text-white table-auto border-collapse">
-          <thead>
-            <tr className="border-b border-gray-700">
-              <th className="px-4 py-2 text-left">Дата</th>
-              <th className="px-4 py-2 text-left">Тип</th>
-              <th className="px-4 py-2 text-left">Категория</th>
-              <th className="px-4 py-2 text-left">Сумма</th>
-            </tr>
-          </thead>
-          <tbody>
-            {expences &&
-              expences.map((t, idx) => (
-                <tr key={idx} className="border-b border-gray-700">
+        <div className="overflow-x-auto">
+          <table className="w-full text-white table-auto border-collapse">
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="px-4 py-2 text-left">Дата</th>
+                <th className="px-4 py-2 text-left">Тип</th>
+                <th className="px-4 py-2 text-left">Категория</th>
+                <th className="px-4 py-2 text-left">Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expences?.map((t, idx) => (
+                <tr
+                  key={`expense-${t.date}-${idx}`}
+                  className="border-b border-gray-700"
+                >
                   <td className="px-4 py-2">{t.date.split(",")[0]}</td>
-                  <td>{t.category}</td>
+                  <td className="px-4 py-2">{t.category}</td>
                   <td className="px-4 py-2">{t.category}</td>
                   <td className="px-4 py-2">{t.price.toLocaleString()} сом</td>
                 </tr>
-              ))}
-          </tbody>
-        </table>
+              )) || []}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {incomeModal && (
-        <IncomeModal
-          setBalance={setBalance}
-          balance={balance}
-          handleBalanceCreate={handleBalanceCreate}
-          setIncomeModal={setIncomeModal}
-        />
-      )}
+      {/* Modals */}
+      {incomeModal && <IncomeModal setIncomeModal={handleIncomeModalClose} />}
 
       {expenseModal && (
-        <ExpenceModal
-          setExpenseModal={setExpenseModal}
-          setExpenceState={setExpenceState}
-          expenceState={expenceState}
-          createExpence={createExpence}
-          goals={goals}
-        />
+        <ExpenceModal setExpenseModal={handleExpenseModalClose} goals={goals} />
       )}
-      {goalModal && (
-        <GoalModal
-          setGoalModal={setGoalModal}
-          goalState={goalState}
-          setGoalState={setGoalState}
-          createGoals={createGoals}
-        />
-      )}
+
+      {goalModal && <GoalModal setGoalModal={handleGoalModalClose} />}
     </section>
   );
 };

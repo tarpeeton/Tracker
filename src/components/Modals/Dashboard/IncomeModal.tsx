@@ -1,29 +1,28 @@
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useState , useCallback } from "react";
 import {X} from 'lucide-react'
+import { DashboardStore } from "@/store/Dashboard";
 
 
 
 
-interface Balance {
-  price: number;
-  date: string;
-}
+
 
 interface IncomeModal {
   setIncomeModal: Dispatch<SetStateAction<boolean>>;
-  setBalance: Dispatch<SetStateAction<Balance>>;
-  balance: Balance;
-  handleBalanceCreate: () => void;
 }
 
 export const IncomeModal = ({
   setIncomeModal,
-  setBalance,
-  balance,
-  handleBalanceCreate,
 }: IncomeModal) => {
+  const {addBalance} = DashboardStore()
 
-
+  const [balance, setBalance] = useState({ price: 0, date: "" });
+  const handleBalanceCreate = useCallback(() => {
+    addBalance(balance.price, balance.date);
+    setIncomeModal(false);
+    // State ni reset qilish
+    setBalance({ price: 0, date: "" });
+  }, [balance.price, balance.date, addBalance]);
 
 
   return (

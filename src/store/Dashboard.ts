@@ -43,6 +43,7 @@ interface IDashboardStore {
   isLoading: boolean;
   error: string | null;
   initialize: () => Promise<void>;
+  deleteGoal: (id: string) => void;
   addBalance: (price: number, date: string) => Promise<void>;
   addExpence: (
     price: number,
@@ -94,11 +95,11 @@ export const DashboardStore = create<IDashboardStore>((set, get) => ({
         .single();
 
       if (profileError) throw profileError;
-        console.log(profileData , "PROFILE DATA")
       const { data: goalsData, error: goalsError } = await supabase
         .from("goals")
         .select("id, name, price, balance")
         .eq("user_id", userId);
+
 
       if (goalsError) throw goalsError;
 
@@ -115,7 +116,6 @@ export const DashboardStore = create<IDashboardStore>((set, get) => ({
         .eq("user_id", userId);
 
       if (historyError) throw historyError;
-
 
       set({
         totalProfit: profileData?.total_profit ?? 0,
@@ -210,9 +210,14 @@ export const DashboardStore = create<IDashboardStore>((set, get) => ({
     const expenseDate = date || new Date().toISOString();
 
     try {
-      const { data: goalData } = !category && goalID
-        ? await supabase.from("goals").select("name").eq("id", goalID).single()
-        : { data: null };
+      const { data: goalData } =
+        !category && goalID
+          ? await supabase
+              .from("goals")
+              .select("name")
+              .eq("id", goalID)
+              .single()
+          : { data: null };
 
       const updateCatName = goalData?.name || category;
 
@@ -299,4 +304,31 @@ export const DashboardStore = create<IDashboardStore>((set, get) => ({
       set({ error: errorMessage });
     }
   },
+ deleteGoal: async (id) => {
+  const user: IUser | null = useUserStore.getState().user;
+  if (!user?.user_id) {
+    set({ error: "User not authenticated" });
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from("goals")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.user_id);
+
+    if (error) throw error;
+
+    set((state) => ({
+      ...state,
+      goals: state.goals.filter((goal) => goal.id !== id),
+    }));
+  } catch (err: unknown) {
+    const errorMessage =
+      (err as SupabaseError)?.message || "Unknown error occurred";
+    set({ error: errorMessage });
+  }
+},
+
 }));

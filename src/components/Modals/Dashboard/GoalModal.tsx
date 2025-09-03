@@ -1,28 +1,21 @@
-import {Dispatch , SetStateAction } from 'react';
+import { DashboardStore } from "@/store/Dashboard";
 import { X } from "lucide-react";
-
-
-interface GoalItem {
-  price: number,
-  name: string
-}
-
-
+import { Dispatch, SetStateAction, useState } from "react";
 
 interface IGoalModal {
   setGoalModal: Dispatch<SetStateAction<boolean>>;
-  goalState: GoalItem;
-  setGoalState: Dispatch<SetStateAction<GoalItem>>;
-  createGoals: () => void;
 }
 
+export const GoalModal = ({ setGoalModal }: IGoalModal) => {
+  const { addGoal } = DashboardStore();
+  const [goalState, setGoalState] = useState({ price: 0, name: "" });
 
+  const createGoals = () => {
+    addGoal(goalState.price, goalState.name);
+    setGoalModal(false);
+    setGoalState({ price: 0, name: "" });
+  };
 
-
-export const GoalModal = ({setGoalModal,
-goalState,
-setGoalState,
-createGoals}:IGoalModal ) => {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-gray-800 p-6 rounded-lg w-96 relative shadow-lg">
@@ -63,4 +56,4 @@ createGoals}:IGoalModal ) => {
       </div>
     </div>
   );
-}
+};
